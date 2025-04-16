@@ -142,11 +142,30 @@ def dashboard():
     stocks_ref = db.reference('stocks')
     stocks_data = stocks_ref.get() or {}
     
-    # Convert Firebase-safe names back to display format
+    # Convert Firebase-safe names back to display format and add purchase info
     stocks = {}
     for firebase_name, stock_data in stocks_data.items():
         display_name = from_firebase_name(firebase_name)
         stocks[display_name] = stock_data
+        
+        # Add purchase price information if user owns this stock
+        if display_name in user_data['portfolio']:
+            # Find the most recent purchase transaction for this stock
+            purchase_price = None
+            for transaction in reversed(user_data['transactions']):
+                if transaction['stock'] == display_name and transaction['type'] == 'buy':
+                    purchase_price = transaction['price']
+                    break
+            
+            # Add purchase info to stock data
+            if purchase_price:
+                stocks[display_name]['purchase_price'] = purchase_price
+                # Calculate profit/loss
+                current_price = float(stock_data['price'])
+                profit_loss = current_price - purchase_price
+                profit_loss_percent = (profit_loss / purchase_price) * 100
+                stocks[display_name]['profit_loss'] = profit_loss
+                stocks[display_name]['profit_loss_percent'] = profit_loss_percent
     
     return render_template('dashboard.html', 
                          user=user_data,
