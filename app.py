@@ -15,19 +15,35 @@ app = Flask(__name__)
 app.secret_key = os.getenv('FLASK_SECRET_KEY', 'your-secret-key-here')
 
 # Initialize Firebase
-firebase_credentials = os.getenv('FIREBASE_CREDENTIALS')
-if firebase_credentials:
-    # Decode base64 credentials
-    cred_json = base64.b64decode(firebase_credentials).decode('utf-8')
-    cred_dict = json.loads(cred_json)
-    cred = credentials.Certificate(cred_dict)
-else:
-    # Fallback to file-based credentials
-    cred = credentials.Certificate(os.getenv('FIREBASE_CREDENTIALS_PATH', 'FakeStockSim Firebase Service Account.json'))
+def initialize_firebase():
+    try:
+        # Try to get base64 credentials first
+        firebase_credentials = os.getenv('FIREBASE_CREDENTIALS')
+        if firebase_credentials:
+            # Decode base64 credentials
+            cred_json = base64.b64decode(firebase_credentials).decode('utf-8')
+            cred_dict = json.loads(cred_json)
+            return credentials.Certificate(cred_dict)
+        
+        # Fallback to file-based credentials for local development
+        cred_path = os.getenv('FIREBASE_CREDENTIALS_PATH', 'FakeStockSim Firebase Service Account.json')
+        if os.path.exists(cred_path):
+            return credentials.Certificate(cred_path)
+        
+        raise ValueError("No Firebase credentials found")
+    except Exception as e:
+        print(f"Error initializing Firebase: {str(e)}")
+        raise
 
-firebase_admin.initialize_app(cred, {
-    'databaseURL': 'https://fakestocksim-default-rtdb.firebaseio.com'
-})
+try:
+    cred = initialize_firebase()
+    firebase_admin.initialize_app(cred, {
+        'databaseURL': 'https://fakestocksim-default-rtdb.firebaseio.com'
+    })
+except Exception as e:
+    print(f"Failed to initialize Firebase: {str(e)}")
+    # You might want to handle this error differently in production
+    raise
 
 # Flask-Login setup
 login_manager = LoginManager()
