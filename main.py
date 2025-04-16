@@ -17,9 +17,9 @@ firebase_admin.initialize_app(cred, {
 
 # Initial Stock Data
 stocks = {
-    'John Lawyers': {'name': 'John Lawyers', 'price': 94, 'previous_price': 94},
-    'Tidli Co': {'name': 'Tidli Co', 'price': 150, 'previous_price': 150},
-    'UMAE': {'name': 'UMAE', 'price': 500, 'previous_price': 500}
+    'John Lawyers': {'name': 'John Lawyers', 'price': 94, 'previous_price': 94, 'closing_price': 94},
+    'Tidli Co': {'name': 'Tidli Co', 'price': 150, 'previous_price': 150, 'closing_price': 150},
+    'UMAE': {'name': 'UMAE', 'price': 500, 'previous_price': 500, 'closing_price': 500}
 }
 
 events = {
@@ -30,6 +30,9 @@ events = {
 
 # User Management
 users = {}
+
+# Market status
+market_open = True
 
 def get_dow_previous_close():
     try:
@@ -71,6 +74,9 @@ def calculate_percent_change(old_price, new_price):
     return f"{sign}{percent_change:.2f}%"
 
 def update_stocks():
+    if not market_open:
+        return  # Don't update prices if market is closed
+        
     dow_reference = get_dow_previous_close()
 
     # 33% chance an event happens
@@ -150,24 +156,21 @@ def save_user_to_firebase(username, user_data):
     if 'cash' not in user_data:
         user_data['cash'] = 0.0
     
-    # Calculate total portfolio value
-    portfolio_value = sum(
-        get_stock_price(stock) * qty 
-        for stock, qty in user_data['portfolio'].items()
-        if get_stock_price(stock) is not None
-    )
-    total_value = user_data['cash'] + portfolio_value
-
-    # Format portfolio data with current prices
+    # Calculate total portfolio value using current prices
+    portfolio_value = 0
     formatted_portfolio = {}
     for stock, qty in user_data['portfolio'].items():
         current_price = get_stock_price(stock)
         if current_price is not None:
+            stock_value = current_price * qty
+            portfolio_value += stock_value
             formatted_portfolio[stock] = {
                 'quantity': qty,
                 'current_price': current_price,
-                'total_value': current_price * qty
+                'total_value': stock_value
             }
+
+    total_value = user_data['cash'] + portfolio_value
 
     # Create the user data structure
     firebase_data = {
@@ -464,6 +467,9 @@ class StockConsole(cmd.Cmd):
                 
             print(f"\nTotal Portfolio Value: ${user_data['cash'] + total_value:.2f}")
             
+        # Save updated portfolio value to Firebase
+        save_user_to_firebase(self.current_user, user_data)
+        
     def do_history(self, arg):
         """Show transaction history for current user"""
         if not self.current_user:
@@ -492,6 +498,46 @@ class StockConsole(cmd.Cmd):
         """Exit the program"""
         return self.do_exit(arg)
 
+    def do_market_status(self, arg):
+        """Show current market status"""
+        status = "OPEN" if market_open else "CLOSED"
+        print(f"\n=== Market Status ===")
+        print(f"Market is currently {status}")
+        if not market_open:
+            print("\nClosing Prices:")
+            for name, data in stocks.items():
+                print(f"{name}: ${data['closing_price']:.2f}")
+        print()
+        
+    def do_close_market(self, arg):
+        """Close the market and save closing prices"""
+        global market_open
+        if not market_open:
+            print("❌ Market is already closed")
+            return
+            
+        print("\n=== Closing Market ===")
+        for comp in stocks:
+            # Save current price as closing price
+            stocks[comp]['closing_price'] = stocks[comp]['price']
+            # Update Firebase with closing price
+            safe_name = comp.replace(" ", "_").replace(".", "")
+            db.reference(f'stocks/{safe_name}/closing_price').set(str(stocks[comp]['closing_price']))
+            print(f"Saved closing price for {comp}: ${stocks[comp]['closing_price']:.2f}")
+            
+        market_open = False
+        print("\n✅ Market is now closed")
+        
+    def do_open_market(self, arg):
+        """Open the market"""
+        global market_open
+        if market_open:
+            print("❌ Market is already open")
+            return
+            
+        market_open = True
+        print("\n✅ Market is now open")
+
 def main():
     # Load existing users from Firebase
     global users
@@ -514,12 +560,8 @@ def stock_updater():
     print("🏦 Stock simulator running in background...")
     while True:
         try:
-            if market_open_now():
+            if market_open and market_open_now():
                 update_stocks()
-                # Silent updates - no console output
-            else:
-                # Silent waiting - no console output
-                pass
             time.sleep(1)
         except Exception as e:
             # Only print serious errors

@@ -105,7 +105,7 @@ def login():
 def register():
     if request.method == 'POST':
         username = request.form['username']
-        starting_cash = float(request.form['starting_cash'])
+        starting_cash = 10000.00  # Fixed starting amount
         
         # Check if user exists
         user_ref = db.reference(f'users/{username}')
