@@ -22,10 +22,60 @@ stocks = {
     'UMAE': {'name': 'UMAE', 'price': 500, 'previous_price': 500, 'closing_price': 500}
 }
 
-events = {
-    'John Lawyers': ["launches new ad campaign", "machine breaks down", "partners with Tesla"],
-    'Tidli Co': ["expands to Tokyo", "bike recall", "wins eco award"],
-    'UMAE': ["expands to Tokyo", "bike recall", "wins eco award"]
+eevents = {
+    'John Lawyers': [
+        "launches strategic advertising campaign (+15%)",
+        "experiences critical equipment failure (-20%)",
+        "enters strategic partnership with Tesla (+25%)",
+        "secures victory in high-profile litigation (+30%)",
+        "suffers reputational damage from data breach (-40%)",
+        "completes merger with major competitor (+50%)"
+    ],
+    'Tidli Co': [
+        "successfully enters Tokyo market (+10%)",
+        "issues mass product recall due to safety concerns (-25%)",
+        "receives international environmental excellence award (+15%)",
+        "unveils groundbreaking product innovation (+40%)",
+        "faces leadership uncertainty after CEO resignation (-30%)",
+        "awarded high-value government infrastructure contract (+60%)"
+    ],
+    'UMAE': [
+        "launches Tokyo-based operations (+12%)",
+        "announces voluntary recall following product flaw (-22%)",
+        "recognized for sustainability innovation (+18%)",
+        "reveals breakthrough in renewable energy technology (+80%)",
+        "undergoes regulatory scrutiny amid compliance concerns (-45%)",
+        "forms alliance with SpaceX for joint development (+70%)"
+    ]
+}
+
+
+# Special event probabilities and impacts
+special_events = {
+    'John Lawyers': {
+        'probability': 0.05,  # 5% chance per update
+        'impacts': {
+            'wins major lawsuit': 0.30,  # +30%
+            'data breach scandal': -0.40,  # -40%
+            'merges with rival firm': 0.50  # +50%
+        }
+    },
+    'Tidli Co': {
+        'probability': 0.05,
+        'impacts': {
+            'launches revolutionary product': 0.40,
+            'CEO resigns': -0.30,
+            'secures government contract': 0.60
+        }
+    },
+    'UMAE': {
+        'probability': 0.05,
+        'impacts': {
+            'discovers new energy source': 0.80,
+            'regulatory investigation': -0.45,
+            'partners with SpaceX': 0.70
+        }
+    }
 }
 
 # User Management
@@ -79,56 +129,47 @@ def update_stocks():
         
     dow_reference = get_dow_previous_close()
 
-    # 33% chance an event happens
-    event_happens = random.choice([True, False, False])
-    event_company = random.choice(list(events.keys())) if event_happens else None
-    triggered_event = None
-    event_impact = 0
-
     for comp in stocks:
         old_price = stocks[comp]['price']
-        stocks[comp]['previous_price'] = old_price  # Store previous price
+        stocks[comp]['previous_price'] = old_price
 
-        # Base movement
-        base_change = random.uniform(-0.2, 0.2)  # Regular fluctuation
+        # Check for special event
+        if random.random() < special_events[comp]['probability']:
+            event = random.choice(list(special_events[comp]['impacts'].keys()))
+            impact = special_events[comp]['impacts'][event]
+            price_change = old_price * impact
+            new_price = round(old_price + price_change, 2)
+            
+            # Log the special event
+            event_text = f"SPECIAL EVENT: {comp} {event} ({'+' if impact > 0 else ''}{impact*100:.0f}%)"
+            db.reference(f'events/{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}').set(event_text)
+            
+        else:
+            # Regular market movement
+            base_change = random.uniform(-0.2, 0.2)
+            dow_factor = random.uniform(0.9, 1.1)
+            price_change = old_price * (base_change / 100) * dow_factor
+            new_price = round(old_price + price_change, 2)
 
-        # If this company has an event
-        if event_happens and comp == event_company:
-            triggered_event = random.choice(events[comp])
-            event_impact = random.uniform(-2, 2)  # ±2%
-            base_change += event_impact
-
-        # Dow correlation
-        dow_factor = random.uniform(0.9, 1.1)
-        price_change = old_price * (base_change / 100) * dow_factor
-
-        # New price
-        new_price = round(old_price + price_change, 2)
-        new_price = max(1, new_price)  # no negative prices
+        # Ensure price stays positive
+        new_price = max(1, new_price)
 
         # Update in local dict
         stocks[comp]['price'] = new_price
         
-        # Calculate percentage change - IMPORTANT FOR THE FRONTEND
+        # Calculate percentage change
         percent_change = calculate_percent_change(old_price, new_price)
 
         # Firebase-safe company name
         safe_name = comp.replace(" ", "_").replace(".", "")
 
-        # Push to Firebase - MATCH THE FRONTEND EXPECTED FORMAT
+        # Push to Firebase
         db.reference(f'stocks/{safe_name}').set({
             'name': comp,
-            'price': str(new_price),  # Convert to string to match frontend expectations
-            'change': percent_change,  # Add percentage change
-            'last_updated': datetime.now().strftime('%Y-%m-%d %H:%M:%S')  # Renamed to match frontend
+            'price': str(new_price),
+            'change': percent_change,
+            'last_updated': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         })
-
-        # Log the event
-        if triggered_event and comp == event_company:
-            # Add impact percentage to event - IMPORTANT FOR THE FRONTEND
-            event_impact_str = calculate_percent_change(0, event_impact)
-            event_text = f"{comp} {triggered_event} ({event_impact_str})"
-            db.reference(f'events/{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}').set(event_text)
 
 def load_users_from_firebase():
     """Load existing users from Firebase"""
@@ -520,12 +561,19 @@ class StockConsole(cmd.Cmd):
         for comp in stocks:
             # Save current price as closing price
             stocks[comp]['closing_price'] = stocks[comp]['price']
-            # Update Firebase with closing price
+            
+            # Update Firebase with closing price and market status
             safe_name = comp.replace(" ", "_").replace(".", "")
-            db.reference(f'stocks/{safe_name}/closing_price').set(str(stocks[comp]['closing_price']))
+            db.reference(f'stocks/{safe_name}').update({
+                'closing_price': str(stocks[comp]['closing_price']),
+                'market_status': 'closed',
+                'last_updated': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            })
             print(f"Saved closing price for {comp}: ${stocks[comp]['closing_price']:.2f}")
             
+        # Set global market status
         market_open = False
+        db.reference('market_status').set('closed')
         print("\n✅ Market is now closed")
         
     def do_open_market(self, arg):
@@ -535,6 +583,19 @@ class StockConsole(cmd.Cmd):
             print("❌ Market is already open")
             return
             
+        # Update market status in Firebase
+        db.reference('market_status').set('open')
+        
+        # Reset previous prices to closing prices
+        for comp in stocks:
+            stocks[comp]['previous_price'] = stocks[comp]['closing_price']
+            safe_name = comp.replace(" ", "_").replace(".", "")
+            db.reference(f'stocks/{safe_name}').update({
+                'previous_price': str(stocks[comp]['previous_price']),
+                'market_status': 'open',
+                'last_updated': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            })
+        
         market_open = True
         print("\n✅ Market is now open")
 
