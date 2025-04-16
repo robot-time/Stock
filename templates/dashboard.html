@@ -3,139 +3,93 @@
 {% block title %}Dashboard - Dow Bones{% endblock %}
 
 {% block content %}
-<div class="container mt-4">
-    <div class="row">
-        <div class="col-md-4">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="card-title mb-0">Portfolio Summary</h5>
-                </div>
-                <div class="card-body">
-                    <p><strong>Cash Balance:</strong> ${{ "%.2f"|format(user.cash_balance) }}</p>
-                    <p><strong>Portfolio Value:</strong> ${{ "%.2f"|format(user.total_portfolio_value) }}</p>
-                </div>
+<div class="row">
+    <div class="col-md-4">
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">Account Summary</h5>
+                <p class="card-text">
+                    Cash Balance: ${{ user.cash_balance|round(2) }}<br>
+                    Portfolio Value: ${{ user.total_portfolio_value|round(2) }}<br>
+                    Last Updated: {{ user.last_updated }}
+                </p>
             </div>
         </div>
-        
-        <div class="col-md-8">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="card-title mb-0">Your Stocks</h5>
-                </div>
-                <div class="card-body">
-                    {% if user.portfolio %}
-                        <div class="table-responsive">
-                            <table class="table">
-                                <thead>
+
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Your Portfolio</h5>
+                {% if user.portfolio %}
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Stock</th>
+                                    <th>Shares</th>
+                                    <th>Purchase Price</th>
+                                    <th>Current Value</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for stock_name, stock_data in user.portfolio.items() %}
                                     <tr>
-                                        <th>Stock</th>
-                                        <th>Shares</th>
-                                        <th>Current Price</th>
-                                        <th>Purchase Price</th>
-                                        <th>Profit/Loss</th>
-                                        <th>Total Value</th>
-                                        <th>Actions</th>
+                                        <td>{{ stock_name }}</td>
+                                        <td>{{ stock_data.quantity }}</td>
+                                        <td>${{ (stock_data.total_value / stock_data.quantity)|round(2) }}</td>
+                                        <td>${{ stock_data.total_value|round(2) }}</td>
                                     </tr>
-                                </thead>
-                                <tbody>
-                                    {% for stock_name, stock_data in user.portfolio.items() %}
-                                        <tr>
-                                            <td>{{ stock_name }}</td>
-                                            <td>{{ stock_data.quantity }}</td>
-                                            <td>${{ "%.2f"|format(stocks[stock_name].price|float) }}</td>
-                                            <td>
-                                                {% if stocks[stock_name].purchase_price %}
-                                                    ${{ "%.2f"|format(stocks[stock_name].purchase_price) }}
-                                                {% else %}
-                                                    N/A
-                                                {% endif %}
-                                            </td>
-                                            <td>
-                                                {% if stocks[stock_name].profit_loss is defined %}
-                                                    <span class="{{ 'text-success' if stocks[stock_name].profit_loss >= 0 else 'text-danger' }}">
-                                                        ${{ "%.2f"|format(stocks[stock_name].profit_loss) }}
-                                                        ({{ "%.2f"|format(stocks[stock_name].profit_loss_percent) }}%)
-                                                    </span>
-                                                {% else %}
-                                                    N/A
-                                                {% endif %}
-                                            </td>
-                                            <td>${{ "%.2f"|format(stock_data.total_value) }}</td>
-                                            <td>
-                                                <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#buyModal{{ loop.index }}">
-                                                    Buy
-                                                </button>
-                                                <button type="button" class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#sellModal{{ loop.index }}">
-                                                    Sell
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="text-muted">You don't own any stocks yet.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Available Stocks</h5>
+                <div class="row">
+                    {% for stock_name, stock_data in stocks.items() %}
+                        <div class="col-md-6 mb-4">
+                            <div class="card stock-card">
+                                <div class="card-body">
+                                    <h5 class="card-title">{{ stock_data.name }}</h5>
+                                    <p class="card-text">
+                                        Price: ${{ stock_data.price }}<br>
+                                        Change: <span class="{{ 'positive' if stock_data.change.startswith('+') else 'negative' }}">
+                                            {{ stock_data.change }}
+                                        </span>
+                                    </p>
+                                    
+                                    <form method="POST" action="{{ url_for('buy') }}" class="mb-2">
+                                        <input type="hidden" name="stock_name" value="{{ stock_name }}">
+                                        <div class="input-group">
+                                            <input type="number" name="quantity" class="form-control" min="1" value="1" required>
+                                            <button type="submit" class="btn btn-success">Buy</button>
+                                        </div>
+                                    </form>
+                                    
+                                    {% if stock_name in user.portfolio %}
+                                        <form method="POST" action="{{ url_for('sell') }}">
+                                            <input type="hidden" name="stock_name" value="{{ stock_name }}">
+                                            <div class="input-group">
+                                                <input type="number" name="quantity" class="form-control" min="1" max="{{ user.portfolio[stock_name].quantity }}" value="1" required>
+                                                <button type="submit" class="btn btn-danger">Sell</button>
+                                            </div>
+                                        </form>
+                                    {% endif %}
+                                </div>
+                            </div>
                         </div>
-                    {% else %}
-                        <p>You don't own any stocks yet.</p>
-                    {% endif %}
+                    {% endfor %}
                 </div>
             </div>
         </div>
     </div>
 </div>
-
-<!-- Buy and Sell Modals -->
-{% for stock_name, stock_data in user.portfolio.items() %}
-    <!-- Buy Modal -->
-    <div class="modal fade" id="buyModal{{ loop.index }}" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Buy {{ stock_name }}</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <form action="{{ url_for('buy') }}" method="POST">
-                    <div class="modal-body">
-                        <div class="mb-3">
-                            <label for="quantity{{ loop.index }}" class="form-label">Quantity</label>
-                            <input type="number" class="form-control" id="quantity{{ loop.index }}" name="quantity" min="1" required>
-                            <input type="hidden" name="stock_name" value="{{ stock_name }}">
-                        </div>
-                        <p>Current Price: ${{ "%.2f"|format(stocks[stock_name].price|float) }}</p>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                        <button type="submit" class="btn btn-primary">Buy</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-
-    <!-- Sell Modal -->
-    <div class="modal fade" id="sellModal{{ loop.index }}" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Sell {{ stock_name }}</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <form action="{{ url_for('sell') }}" method="POST">
-                    <div class="modal-body">
-                        <div class="mb-3">
-                            <label for="sellQuantity{{ loop.index }}" class="form-label">Quantity</label>
-                            <input type="number" class="form-control" id="sellQuantity{{ loop.index }}" name="quantity" min="1" max="{{ stock_data.quantity }}" required>
-                            <input type="hidden" name="stock_name" value="{{ stock_name }}">
-                        </div>
-                        <p>Current Price: ${{ "%.2f"|format(stocks[stock_name].price|float) }}</p>
-                        <p>Shares Owned: {{ stock_data.quantity }}</p>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                        <button type="submit" class="btn btn-danger">Sell</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-{% endfor %}
 {% endblock %} 
