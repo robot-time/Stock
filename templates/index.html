@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}Home - FakeStockSim{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8 offset-md-2">
+        <h1 class="text-center mb-4">Welcome to FakeStockSim</h1>
+        <p class="text-center mb-4">A simulated stock trading platform where you can practice trading without real money.</p>
+        
+        {% if not current_user.is_authenticated %}
+            <div class="text-center mb-4">
+                <a href="{{ url_for('register') }}" class="btn btn-primary me-2">Register</a>
+                <a href="{{ url_for('login') }}" class="btn btn-outline-primary">Login</a>
+            </div>
+        {% endif %}
+        
+        <h2 class="mb-3">Available Stocks</h2>
+        <div class="row">
+            {% for stock_name, stock_data in stocks.items() %}
+                <div class="col-md-6 mb-4">
+                    <div class="card stock-card">
+                        <div class="card-body">
+                            <h5 class="card-title">{{ stock_data.name }}</h5>
+                            <p class="card-text">
+                                Price: ${{ stock_data.price }}<br>
+                                Change: <span class="{{ 'positive' if stock_data.change.startswith('+') else 'negative' }}">
+                                    {{ stock_data.change }}
+                                </span>
+                            </p>
+                            <p class="card-text"><small class="text-muted">Last updated: {{ stock_data.last_updated }}</small></p>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %} 

@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - FakeStockSim{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-4">
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">Account Summary</h5>
+                <p class="card-text">
+                    Cash Balance: ${{ user.cash_balance|round(2) }}<br>
+                    Portfolio Value: ${{ user.total_portfolio_value|round(2) }}<br>
+                    Last Updated: {{ user.last_updated }}
+                </p>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Your Portfolio</h5>
+                {% if user.portfolio %}
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Stock</th>
+                                    <th>Shares</th>
+                                    <th>Value</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for stock_name, stock_data in user.portfolio.items() %}
+                                    <tr>
+                                        <td>{{ stock_name }}</td>
+                                        <td>{{ stock_data.quantity }}</td>
+                                        <td>${{ stock_data.total_value|round(2) }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="text-muted">You don't own any stocks yet.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Available Stocks</h5>
+                <div class="row">
+                    {% for stock_name, stock_data in stocks.items() %}
+                        <div class="col-md-6 mb-4">
+                            <div class="card stock-card">
+                                <div class="card-body">
+                                    <h5 class="card-title">{{ stock_data.name }}</h5>
+                                    <p class="card-text">
+                                        Price: ${{ stock_data.price }}<br>
+                                        Change: <span class="{{ 'positive' if stock_data.change.startswith('+') else 'negative' }}">
+                                            {{ stock_data.change }}
+                                        </span>
+                                    </p>
+                                    
+                                    <form method="POST" action="{{ url_for('buy') }}" class="mb-2">
+                                        <input type="hidden" name="stock_name" value="{{ stock_name }}">
+                                        <div class="input-group">
+                                            <input type="number" name="quantity" class="form-control" min="1" value="1" required>
+                                            <button type="submit" class="btn btn-success">Buy</button>
+                                        </div>
+                                    </form>
+                                    
+                                    {% if stock_name in user.portfolio %}
+                                        <form method="POST" action="{{ url_for('sell') }}">
+                                            <input type="hidden" name="stock_name" value="{{ stock_name }}">
+                                            <div class="input-group">
+                                                <input type="number" name="quantity" class="form-control" min="1" max="{{ user.portfolio[stock_name].quantity }}" value="1" required>
+                                                <button type="submit" class="btn btn-danger">Sell</button>
+                                            </div>
+                                        </form>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 
