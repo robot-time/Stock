@@ -18,12 +18,14 @@ firebase_admin.initialize_app(cred, {
 # Initial Stock Data
 stocks = {
     'John Lawyers': {'name': 'John Lawyers', 'price': 94, 'previous_price': 94},
-    'Tidli Co': {'name': 'Tidli Co', 'price': 150, 'previous_price': 150}
+    'Tidli Co': {'name': 'Tidli Co', 'price': 150, 'previous_price': 150},
+    'UMAE': {'name': 'UMAE', 'price': 500, 'previous_price': 500}
 }
 
 events = {
     'John Lawyers': ["launches new ad campaign", "machine breaks down", "partners with Tesla"],
-    'Tidli Co': ["expands to Tokyo", "bike recall", "wins eco award"]
+    'Tidli Co': ["expands to Tokyo", "bike recall", "wins eco award"],
+    'UMAE': ["expands to Tokyo", "bike recall", "wins eco award"]
 }
 
 # User Management
