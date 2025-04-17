@@ -130,9 +130,46 @@ def register():
     
     return render_template('register.html')
 
+def check_market_status():
+    """Check if market should be open but isn't receiving updates"""
+    try:
+        # Get market status from Firebase
+        market_status = db.reference('market_status').get()
+        if market_status == 'open':
+            # Check if we're getting updates
+            stocks_ref = db.reference('stocks')
+            stocks_data = stocks_ref.get() or {}
+            if not stocks_data:
+                return False
+            
+            # Check last update time
+            for stock_data in stocks_data.values():
+                last_updated = datetime.strptime(stock_data.get('last_updated', ''), '%Y-%m-%d %H:%M:%S')
+                if (datetime.now() - last_updated).total_seconds() > 60:  # No updates in last minute
+                    return False
+        return True
+    except Exception as e:
+        print(f"Error checking market status: {str(e)}")
+        return False
+
+@app.route('/market-status')
+def market_status():
+    """Market status check endpoint"""
+    is_healthy = check_market_status()
+    return {'status': 'healthy' if is_healthy else 'down'}
+
+@app.route('/market-down')
+def market_down():
+    """Market down warning page"""
+    return render_template('market_down.html')
+
 @app.route('/dashboard')
 @login_required
 def dashboard():
+    # Check market status first
+    if not check_market_status():
+        return redirect(url_for('market_down'))
+        
     # Get user's portfolio
     user_ref = db.reference(f'users/{current_user.id}')
     user_data = user_ref.get()
@@ -142,30 +179,11 @@ def dashboard():
     stocks_ref = db.reference('stocks')
     stocks_data = stocks_ref.get() or {}
     
-    # Convert Firebase-safe names back to display format and add purchase info
+    # Convert Firebase-safe names back to display format
     stocks = {}
     for firebase_name, stock_data in stocks_data.items():
         display_name = from_firebase_name(firebase_name)
         stocks[display_name] = stock_data
-        
-        # Add purchase price information if user owns this stock
-        if display_name in user_data['portfolio']:
-            # Find the most recent purchase transaction for this stock
-            purchase_price = None
-            for transaction in reversed(user_data['transactions']):
-                if transaction['stock'] == display_name and transaction['type'] == 'buy':
-                    purchase_price = transaction['price']
-                    break
-            
-            # Add purchase info to stock data
-            if purchase_price:
-                stocks[display_name]['purchase_price'] = purchase_price
-                # Calculate profit/loss
-                current_price = float(stock_data['price'])
-                profit_loss = current_price - purchase_price
-                profit_loss_percent = (profit_loss / purchase_price) * 100
-                stocks[display_name]['profit_loss'] = profit_loss
-                stocks[display_name]['profit_loss_percent'] = profit_loss_percent
     
     return render_template('dashboard.html', 
                          user=user_data,

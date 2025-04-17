@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block title %}Market Down - Dow Bones{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-warning text-dark">
+                    <h3 class="text-center mb-0">⚠️ Market Currently Down</h3>
+                </div>
+                <div class="card-body text-center">
+                    <div class="alert alert-warning">
+                        <h4 class="alert-heading">Market Out of Order</h4>
+                        <p>
+                            The market should be open but we're not receiving updates.<br>
+                            This could be due to maintenance or technical issues.
+                        </p>
+                        <hr>
+                        <p class="mb-0">
+                            Please try again later or contact support if the issue persists.
+                        </p>
+                    </div>
+                    <div class="mt-4">
+                        <a href="{{ url_for('dashboard') }}" class="btn btn-primary">Check Status Again</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 
